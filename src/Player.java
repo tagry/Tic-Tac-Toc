@@ -9,11 +9,17 @@ class Settings {
 
 	public static final int NB_GENERATION = 50;
 
-	public static final int POPULATION_SIZE = 20;
+	public static final int MY_POPULATION_SIZE = 20;
 
-	public static final int MAX_SELECTION = 3;
+	public static final int HIS_POPULATION_SIZE = 20;
 
-	public static final int MAX_CHILDREN = 2;
+	public static final int MY_MAX_SELECTION = 3;
+
+	public static final int HIS_MAX_SELECTION = 3;
+
+	public static final int MAX_MY_CHILDREN = 2;
+
+	public static final int MAX_HIS_CHILDREN = 2;
 
 	// %
 	public static final int MUTATION_PROBABILITY = 10;
@@ -40,19 +46,24 @@ enum State {
 }
 
 class Board {
-
 	private static State winner = State.NOBODY;
 
-	private static final int GRID_SIZE = 3;
+	private static final int FULL_GRID_SIZE = 9;
+
+	private static final int MAIN_GRID_SIZE = 3;
 
 	// [row][col]
-	private static State[][] initialGrid = new State[GRID_SIZE][GRID_SIZE];
+	private static State[][] initialGrid = new State[FULL_GRID_SIZE][FULL_GRID_SIZE];
 
-	private static State[][] grid = new State[GRID_SIZE][GRID_SIZE];
+	private static State[][] grid = new State[FULL_GRID_SIZE][FULL_GRID_SIZE];
+
+	private static State[][] initialMainGrid = new State[MAIN_GRID_SIZE][MAIN_GRID_SIZE];
+
+	private static State[][] mainGrid = new State[MAIN_GRID_SIZE][MAIN_GRID_SIZE];
 
 	public static void initBoard() {
-		for (int i = 0; i < GRID_SIZE; i++) {
-			for (int j = 0; j < GRID_SIZE; j++) {
+		for (int i = 0; i < FULL_GRID_SIZE; i++) {
+			for (int j = 0; j < FULL_GRID_SIZE; j++) {
 				initialGrid[i][j] = State.NOBODY;
 				grid[i][j] = State.NOBODY;
 			}
@@ -62,17 +73,23 @@ class Board {
 	public static void playByMeInitial(Move move) {
 		if (move.row != -1)
 			initialGrid[move.row][move.col] = State.ME;
+		updateInitialMainGrid();
 	}
 
 	public static void playByHimInitial(Move move) {
 		if (move.row != -1)
 			initialGrid[move.row][move.col] = State.HIM;
+		updateInitialMainGrid();
 	}
 
 	public static State SimulateGame(Individual individual1, Individual individual2, int validActionCount) {
 		resetBoard();
 		int individual1Offset = 0;
 		int individual2Offset = 0;
+		
+		//System.err.println(individual1.getMovesString());
+		//System.err.println(individual2.getMovesString());
+		System.err.println("VAD : " + validActionCount);
 
 		for (int i = 0; i < validActionCount && individual1Offset + individual2Offset < validActionCount; i++) {
 			Move moveIndividual1 = individual1.getMove(individual1Offset);
@@ -119,42 +136,113 @@ class Board {
 
 	private static void playByMe(Move move) {
 		grid[move.row][move.col] = State.ME;
+		updateMainGrid();
 		updateWinner();
 	}
 
 	private static void playByHim(Move move) {
 		grid[move.row][move.col] = State.HIM;
+		updateMainGrid();
 		updateWinner();
+	}
+
+	private static void updateInitialMainGrid() {
+		for (int i = 0; i < MAIN_GRID_SIZE; i++) {
+			for (int j = 0; j < MAIN_GRID_SIZE; j++) {
+				if (initialMainGrid[i][j] != State.NOBODY) {
+					initialMainGrid[i][j] = getMainTuleStatue(i, j, initialGrid);
+				}
+			}
+		}
+	}
+	
+	private static void updateMainGrid() {
+		for (int i = 0; i < MAIN_GRID_SIZE; i++) {
+			for (int j = 0; j < MAIN_GRID_SIZE; j++) {
+				if (mainGrid[i][j] != State.NOBODY) {
+					mainGrid[i][j] = getMainTuleStatue(i, j, grid);
+				}
+			}
+		}
+	}
+
+	private static State getMainTuleStatue(int row, int col, State[][] gridChosen) {
+		for (int i = 0; i < 3; i++) {
+			// check rows
+
+			if (gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 0] != State.NOBODY
+					&& gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE
+							+ 0] == gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 1]
+					&& gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE
+							+ 0] == gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 2]) {
+				return gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 0];
+			}
+
+			// check cols
+			if (gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + i] != State.NOBODY
+					&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
+							+ i] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + i]
+					&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
+							+ i] == gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + i]) {
+				return gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + i];
+			}
+		}
+
+		// check diags
+		if (gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 0] != State.NOBODY
+				&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
+						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + 1]
+				&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
+						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 2]) {
+			return gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 0];
+		}
+		if (gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 0] != State.NOBODY
+				&& gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE
+						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + 1]
+				&& gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE
+						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 2]) {
+			return gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 0];
+		}
+		
+		return State.NOBODY;
 	}
 
 	private static void updateWinner() {
 		for (int i = 0; i < 3; i++) {
 			// check rows
-			if (grid[i][0] != State.NOBODY && grid[i][0] == grid[i][1] && grid[i][0] == grid[i][2]) {
-				winner = grid[i][0];
+			if (mainGrid[i][0] != State.NOBODY && mainGrid[i][0] == mainGrid[i][1]
+					&& mainGrid[i][0] == mainGrid[i][2]) {
+				winner = mainGrid[i][0];
 			}
 
 			// check cols
-			if (grid[0][i] != State.NOBODY && grid[0][i] == grid[1][i] && grid[0][i] == grid[2][i]) {
-				winner = grid[0][i];
+			if (mainGrid[0][i] != State.NOBODY && mainGrid[0][i] == mainGrid[1][i]
+					&& mainGrid[0][i] == mainGrid[2][i]) {
+				winner = mainGrid[0][i];
 			}
 		}
 
 		// check diags
-		if (grid[0][0] != State.NOBODY && grid[0][0] == grid[1][1] && grid[0][0] == grid[2][2]) {
-			winner = grid[0][0];
+		if (mainGrid[0][0] != State.NOBODY && mainGrid[0][0] == mainGrid[1][1] && mainGrid[0][0] == mainGrid[2][2]) {
+			winner = mainGrid[0][0];
 		}
-		if (grid[2][0] != State.NOBODY && grid[2][0] == grid[1][1] && grid[2][0] == grid[0][2]) {
-			winner = grid[2][0];
+		if (mainGrid[2][0] != State.NOBODY && mainGrid[2][0] == mainGrid[1][1] && mainGrid[2][0] == mainGrid[0][2]) {
+			winner = mainGrid[2][0];
 		}
 	}
 
 	private static void resetBoard() {
 		winner = State.NOBODY;
 
-		for (int i = 0; i < GRID_SIZE; i++) {
-			for (int j = 0; j < GRID_SIZE; j++) {
+		for (int i = 0; i < FULL_GRID_SIZE; i++) {
+			for (int j = 0; j < FULL_GRID_SIZE; j++) {
 				grid[i][j] = initialGrid[i][j];
+			}
+		}
+
+		for (int i = 0; i < MAIN_GRID_SIZE; i++) {
+			for (int j = 0; j < MAIN_GRID_SIZE; j++) {
+				mainGrid[i][j] = initialMainGrid[i][j];
 			}
 		}
 	}
@@ -225,7 +313,11 @@ class PositionedMoveComparator implements Comparator<PositionnedMove> {
 
 class Population {
 
-	private List<Individual> individualList = new ArrayList<>(Settings.POPULATION_SIZE);
+	private int validActionCount = 0;
+
+	private List<Individual> myIndividuals = new ArrayList<>(Settings.MY_POPULATION_SIZE);
+
+	private List<Individual> hisIndividuals = new ArrayList<>(Settings.MY_POPULATION_SIZE);
 
 	private IndividualComparator comparator = new IndividualComparator();
 
@@ -243,27 +335,76 @@ class Population {
 	}
 
 	public Population(int validActionCount, List<Move> moves) {
-		for (int i = 0; i < Settings.POPULATION_SIZE; i++) {
-			individualList.add(new Individual(validActionCount, moves));
+		this.validActionCount = validActionCount;
+
+		for (int i = 0; i < Settings.MY_POPULATION_SIZE; i++) {
+			myIndividuals.add(new Individual(validActionCount, moves));
+		}
+
+		for (int i = 0; i < Settings.HIS_POPULATION_SIZE; i++) {
+			hisIndividuals.add(new Individual(validActionCount, moves));
 		}
 	}
 
-	public Move getBest() {
+	public void resetScores() {
+		for (Individual individual : myIndividuals) {
+			individual.resetScore();
+		}
+
+		for (Individual individual : hisIndividuals) {
+			individual.resetScore();
+		}
+	}
+
+	public void calculateScores() {
+		for (Individual individual : myIndividuals) {
+			calculateScoreByMines(individual, hisIndividuals);
+		}
+	}
+
+	public void calculateScoreByMines(Individual myIndividual, List<Individual> opponentIndividuals) {
+
+		for (Individual individual : opponentIndividuals) {
+			if (getPlayAgainsDecision()) {
+				State state = Board.SimulateGame(myIndividual, individual, validActionCount);
+				if (state == State.ME) {
+					System.err.println("WIN");
+					myIndividual.increaseScore(Settings.POINTS_BY_VICTORY);
+					individual.increaseScore(Settings.POINTS_BY_LOOSE);
+				} else if (state == State.NOBODY) {
+					System.err.println("NOBODY");
+					myIndividual.increaseScore(Settings.POINTS_BY_EQUALITY);
+					individual.increaseScore(Settings.POINTS_BY_EQUALITY);
+				} else {
+					System.err.println("LOOSE");
+					myIndividual.increaseScore(Settings.POINTS_BY_LOOSE);
+					individual.increaseScore(Settings.POINTS_BY_VICTORY);
+				}
+			}
+		}
+	}
+
+	private static boolean getPlayAgainsDecision() {
+		return 0 + (int) (Math.random() * ((100 - 0) + 1)) < Settings.PLAY_AGAINS_PROBABILITY;
+	}
+
+	public Move getMyBest() {
 		sortIndividuals();
-		return individualList.get(0).getMove(0);
+		return myIndividuals.get(0).getMove(0);
 	}
 
 	public void sortIndividuals() {
-		for (Individual individual : individualList) {
-			individual.calculateScore(individualList);
-		}
-
-		Collections.sort(individualList, comparator);
+		calculateScores();
+		Collections.sort(myIndividuals, comparator);
+		Collections.sort(hisIndividuals, comparator);
 	}
 
-	public void updateIndividuals(List<Individual> newIndividuals) {
-		individualList = individualList.subList(0, individualList.size() - Settings.MAX_CHILDREN);
-		individualList.addAll(newIndividuals);
+	public void updateIndividuals(List<Individual> myNewIndividuals, List<Individual> hisNewIndividuals) {
+		myIndividuals = myIndividuals.subList(0, myIndividuals.size() - Settings.MAX_MY_CHILDREN);
+		myIndividuals.addAll(myNewIndividuals);
+
+		hisIndividuals = hisIndividuals.subList(0, hisIndividuals.size() - Settings.MAX_HIS_CHILDREN);
+		hisIndividuals.addAll(hisNewIndividuals);
 	}
 
 	public List<Individual> getNewGenerationIndividuals(List<Couple> couples) {
@@ -279,8 +420,8 @@ class Population {
 	public List<Couple> getCouples(List<Individual> individualsSelected) {
 		List<Couple> couples = new ArrayList<>();
 
-		for (int i = 0; i < Settings.MAX_SELECTION; i++) {
-			for (int j = 0; j < Settings.MAX_SELECTION; j++) {
+		for (int i = 0; i < Settings.MY_MAX_SELECTION; i++) {
+			for (int j = 0; j < Settings.MY_MAX_SELECTION; j++) {
 				if (i != j) {
 					Couple couple = new Couple(individualsSelected.get(i), individualsSelected.get(j));
 					couples.add(couple);
@@ -290,32 +431,48 @@ class Population {
 
 		Collections.shuffle(couples);
 
-		if (couples.size() < Settings.MAX_CHILDREN) {
+		if (couples.size() < Settings.MAX_MY_CHILDREN) {
 			return couples;
 		}
 
-		return couples.subList(0, Settings.MAX_CHILDREN);
+		return couples.subList(0, Settings.MAX_MY_CHILDREN);
 	}
 
-	public List<Individual> selectionIndividuals() {
-		if (individualList.size() < Settings.MAX_SELECTION)
-			return individualList;
+	public List<Individual> mySelectionIndividuals() {
+		if (myIndividuals.size() < Settings.MY_MAX_SELECTION)
+			return myIndividuals;
 
-		return individualList.subList(0, Settings.MAX_SELECTION);
+		return myIndividuals.subList(0, Settings.MY_MAX_SELECTION);
+	}
+
+	public List<Individual> hisSelectionIndividuals() {
+		if (hisIndividuals.size() < Settings.HIS_MAX_SELECTION)
+			return hisIndividuals;
+
+		return hisIndividuals.subList(0, Settings.HIS_MAX_SELECTION);
 	}
 
 	public void mutation() {
-		for (Individual individual : individualList) {
+		for (Individual individual : myIndividuals) {
+			individual.mutation();
+		}
+
+		for (Individual individual : hisIndividuals) {
 			individual.mutation();
 		}
 	}
 
 	@Override
 	public String toString() {
-		String result = "";
+		String result = "MY INDIVIDUALS\n";
 
-		for (Individual individual : individualList) {
-			result += individualList.indexOf(individual) + " ---> " + individual.toString() + "\n";
+		for (Individual individual : myIndividuals) {
+			result += myIndividuals.indexOf(individual) + " ---> " + individual.toString() + "\n";
+		}
+
+		result += "HIS INDIVIDUALS\n";
+		for (Individual individual : hisIndividuals) {
+			result += hisIndividuals.indexOf(individual) + " ---> " + individual.toString() + "\n";
 		}
 
 		return result;
@@ -441,25 +598,12 @@ class Individual {
 		return this.score;
 	}
 
-	public void calculateScore(List<Individual> individuals) {
-		int scoreCalculated = 0;
-
-		for (Individual individual : individuals) {
-			if (individual != this && getPlayAgainsDecision()) {
-				State state = Board.SimulateGame(this, individual, validActionCount);
-				if (state == State.ME)
-					scoreCalculated += Settings.POINTS_BY_VICTORY;
-				else if (state == State.NOBODY)
-					scoreCalculated += Settings.POINTS_BY_EQUALITY;
-				else
-					scoreCalculated += Settings.POINTS_BY_LOOSE;
-			}
-		}
-		score = scoreCalculated;
+	public void resetScore() {
+		this.score = 0;
 	}
 
-	private boolean getPlayAgainsDecision() {
-		return 0 + (int) (Math.random() * ((100 - 0) + 1)) < Settings.PLAY_AGAINS_PROBABILITY;
+	public void increaseScore(int points) {
+		this.score += points;
 	}
 
 	private int getRandomCrossoverPoint() {
@@ -497,6 +641,8 @@ class Player {
 			Board.playByHimInitial(new Move(opponentRow, opponentCol));
 
 			int validActionCount = in.nextInt();
+			System.err.println("VADINIT : " + validActionCount);
+
 			for (int i = 0; i < validActionCount; i++) {
 				int row = in.nextInt();
 				int col = in.nextInt();
@@ -507,6 +653,7 @@ class Player {
 			Population population = new Population(validActionCount, possibleMoves);
 
 			for (int i = 0; i < Settings.NB_GENERATION; i++) {
+				population.resetScores();
 				population.sortIndividuals();
 
 				if (Settings.DEBUG) {
@@ -514,16 +661,20 @@ class Player {
 					System.err.println(population);
 				}
 
-				List<Individual> selection = population.selectionIndividuals();
-				List<Couple> couples = population.getCouples(selection);
-				List<Individual> newIndividuals = population.getNewGenerationIndividuals(couples);
+				List<Individual> mySelection = population.mySelectionIndividuals();
+				List<Couple> myCouples = population.getCouples(mySelection);
+				List<Individual> myNewIndividuals = population.getNewGenerationIndividuals(myCouples);
 
-				population.updateIndividuals(newIndividuals);
+				List<Individual> hisSelection = population.hisSelectionIndividuals();
+				List<Couple> hisCouples = population.getCouples(hisSelection);
+				List<Individual> hisNewIndividuals = population.getNewGenerationIndividuals(hisCouples);
+
+				population.updateIndividuals(myNewIndividuals, hisNewIndividuals);
 				population.mutation();
 			}
 
 			population.sortIndividuals();
-			Move myMove = population.getBest();
+			Move myMove = population.getMyBest();
 			Board.playByMeInitial(myMove);
 
 			System.out.println(myMove.toString());
