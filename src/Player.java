@@ -4,6 +4,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Scanner;
 
+import com.sun.org.apache.xerces.internal.util.Status;
+
 class Settings {
 	public static boolean DEBUG = false;
 
@@ -47,6 +49,10 @@ enum State {
 
 class Board {
 	private static State winner = State.NOBODY;
+	
+	private static State winnerSmall = State.NOBODY;
+	
+	private static State initialWinnerSmall = State.NOBODY;
 
 	private static final int FULL_GRID_SIZE = 9;
 
@@ -61,6 +67,12 @@ class Board {
 
 	private static State[][] mainGrid = new State[MAIN_GRID_SIZE][MAIN_GRID_SIZE];
 
+	private static Move initialLastMovePlayed = new Move(-1,-1);
+	
+	private static Move lastMovePlayed = new Move(-1,-1);
+
+	private static State lastPlayerPlayed = State.NOBODY;
+	
 	public static void initBoard() {
 		for (int i = 0; i < FULL_GRID_SIZE; i++) {
 			for (int j = 0; j < FULL_GRID_SIZE; j++) {
@@ -74,12 +86,15 @@ class Board {
 		if (move.row != -1)
 			initialGrid[move.row][move.col] = State.ME;
 		updateInitialMainGrid();
+		updateInitialWinnerOnSmallGrid();
 	}
 
 	public static void playByHimInitial(Move move) {
+		initialLastMovePlayed.setMove(move.row, move.col);
 		if (move.row != -1)
 			initialGrid[move.row][move.col] = State.HIM;
 		updateInitialMainGrid();
+		updateInitialWinnerOnSmallGrid();
 	}
 
 	public static State SimulateGame(Individual individual1, Individual individual2, int validActionCount) {
@@ -89,7 +104,6 @@ class Board {
 		
 		//System.err.println(individual1.getMovesString());
 		//System.err.println(individual2.getMovesString());
-		System.err.println("VAD : " + validActionCount);
 
 		for (int i = 0; i < validActionCount && individual1Offset + individual2Offset < validActionCount; i++) {
 			Move moveIndividual1 = individual1.getMove(individual1Offset);
@@ -105,7 +119,10 @@ class Board {
 			playByMe(moveIndividual1);
 			individual1Offset++;
 
-			if (winner == State.ME) {
+			//System.err.println(initialWinnerSmall + " " + winnerSmall);
+			if (winner == State.ME || 
+					(initialWinnerSmall == State.NOBODY && winnerSmall == State.ME)) {
+				System.err.println("WIN");
 				return State.ME;
 			}
 
@@ -121,12 +138,15 @@ class Board {
 			}
 			playByHim(moveIndividual2);
 			individual2Offset++;
-
-			if (winner == State.HIM) {
+			
+			if (winner == State.HIM || 
+					(initialWinnerSmall == State.NOBODY && winnerSmall == State.HIM)) {
+				System.err.println("LOOSE");
 				return State.HIM;
 			}
 		}
 
+		System.err.println("NOBODY");
 		return State.NOBODY;
 	}
 
@@ -138,12 +158,14 @@ class Board {
 		grid[move.row][move.col] = State.ME;
 		updateMainGrid();
 		updateWinner();
+		updateWinnerOnSmallGrid();
 	}
 
 	private static void playByHim(Move move) {
 		grid[move.row][move.col] = State.HIM;
 		updateMainGrid();
 		updateWinner();
+		updateWinnerOnSmallGrid();
 	}
 
 	private static void updateInitialMainGrid() {
@@ -167,46 +189,58 @@ class Board {
 	}
 
 	private static State getMainTuleStatue(int row, int col, State[][] gridChosen) {
+		if(row == -1)
+			return State.NOBODY;
+			
 		for (int i = 0; i < 3; i++) {
 			// check rows
 
-			if (gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 0] != State.NOBODY
-					&& gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE
-							+ 0] == gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 1]
-					&& gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE
-							+ 0] == gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 2]) {
-				return gridChosen[row * MAIN_GRID_SIZE + i][col * MAIN_GRID_SIZE + 0];
+			if (gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE + 0] != State.NOBODY
+					&& gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE
+							+ 0] == gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE + 1]
+					&& gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE
+							+ 0] == gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE + 2]) {
+				return gridChosen[row / MAIN_GRID_SIZE + i][col / MAIN_GRID_SIZE + 0];
 			}
 
 			// check cols
-			if (gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + i] != State.NOBODY
-					&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
-							+ i] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + i]
-					&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
-							+ i] == gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + i]) {
-				return gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + i];
+			if (gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE + i] != State.NOBODY
+					&& gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE
+							+ i] == gridChosen[row / MAIN_GRID_SIZE + 1][col / MAIN_GRID_SIZE + i]
+					&& gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE
+							+ i] == gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE + i]) {
+				return gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE + i];
 			}
 		}
 
 		// check diags
-		if (gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 0] != State.NOBODY
-				&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
-						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + 1]
-				&& gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE
-						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 2]) {
-			return gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 0];
+		if (gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE + 0] != State.NOBODY
+				&& gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE
+						+ 0] == gridChosen[row / MAIN_GRID_SIZE + 1][col / MAIN_GRID_SIZE + 1]
+				&& gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE
+						+ 0] == gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE + 2]) {
+			return gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE + 0];
 		}
-		if (gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 0] != State.NOBODY
-				&& gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE
-						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 1][col * MAIN_GRID_SIZE + 1]
-				&& gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE
-						+ 0] == gridChosen[row * MAIN_GRID_SIZE + 0][col * MAIN_GRID_SIZE + 2]) {
-			return gridChosen[row * MAIN_GRID_SIZE + 2][col * MAIN_GRID_SIZE + 0];
+		if (gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE + 0] != State.NOBODY
+				&& gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE
+						+ 0] == gridChosen[row / MAIN_GRID_SIZE + 1][col / MAIN_GRID_SIZE + 1]
+				&& gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE
+						+ 0] == gridChosen[row / MAIN_GRID_SIZE + 0][col / MAIN_GRID_SIZE + 2]) {
+			return gridChosen[row / MAIN_GRID_SIZE + 2][col / MAIN_GRID_SIZE + 0];
 		}
 		
 		return State.NOBODY;
 	}
 
+	private static void updateWinnerOnSmallGrid() {
+		//TODO look at it ! 
+		winnerSmall = getMainTuleStatue(initialLastMovePlayed.row, initialLastMovePlayed.col, grid);
+	}
+	
+	private static void updateInitialWinnerOnSmallGrid() {
+		winnerSmall = getMainTuleStatue(initialLastMovePlayed.row, initialLastMovePlayed.col, initialGrid);
+	}
+	
 	private static void updateWinner() {
 		for (int i = 0; i < 3; i++) {
 			// check rows
@@ -233,6 +267,9 @@ class Board {
 
 	private static void resetBoard() {
 		winner = State.NOBODY;
+		winnerSmall = State.NOBODY;
+		lastMovePlayed.setMove(-1, -1);
+		lastPlayerPlayed = State.NOBODY;
 
 		for (int i = 0; i < FULL_GRID_SIZE; i++) {
 			for (int j = 0; j < FULL_GRID_SIZE; j++) {
@@ -269,6 +306,11 @@ class Move {
 	public int col;
 
 	public Move(int row, int col) {
+		this.row = row;
+		this.col = col;
+	}
+	
+	public void setMove(int row, int col) {
 		this.row = row;
 		this.col = col;
 	}
@@ -368,15 +410,15 @@ class Population {
 			if (getPlayAgainsDecision()) {
 				State state = Board.SimulateGame(myIndividual, individual, validActionCount);
 				if (state == State.ME) {
-					System.err.println("WIN");
+					//System.err.println("WIN");
 					myIndividual.increaseScore(Settings.POINTS_BY_VICTORY);
 					individual.increaseScore(Settings.POINTS_BY_LOOSE);
 				} else if (state == State.NOBODY) {
-					System.err.println("NOBODY");
+					//System.err.println("NOBODY");
 					myIndividual.increaseScore(Settings.POINTS_BY_EQUALITY);
 					individual.increaseScore(Settings.POINTS_BY_EQUALITY);
 				} else {
-					System.err.println("LOOSE");
+					//System.err.println("LOOSE");
 					myIndividual.increaseScore(Settings.POINTS_BY_LOOSE);
 					individual.increaseScore(Settings.POINTS_BY_VICTORY);
 				}
@@ -641,7 +683,6 @@ class Player {
 			Board.playByHimInitial(new Move(opponentRow, opponentCol));
 
 			int validActionCount = in.nextInt();
-			System.err.println("VADINIT : " + validActionCount);
 
 			for (int i = 0; i < validActionCount; i++) {
 				int row = in.nextInt();
